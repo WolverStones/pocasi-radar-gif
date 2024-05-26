@@ -11,6 +11,7 @@ import signal
 output_folder = "output"
 map_file = "../assets/mapa-cr.png"  # Cesta k souboru s mapou
 
+
 class StoppableHTTPServer(HTTPServer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -24,9 +25,10 @@ class StoppableHTTPServer(HTTPServer):
         self.keep_running = False
         # Probuzení serveru, pokud je v nečinnosti
         try:
-            requests.get(f'http://{self.server_name}:{self.server_port}')
+            requests.get(f"http://{self.server_name}:{self.server_port}")
         except requests.RequestException:
             pass
+
 
 def create_gif():
     # Funkce pro stažení obrázku z URL s opakovanými pokusy
@@ -61,7 +63,7 @@ def create_gif():
         success, content, datum_txt = download_image("", time)
         if success:
             file_path = f"layer_{i}.png"
-            with open(file_path, 'wb') as file:
+            with open(file_path, "wb") as file:
                 file.write(content)
             try:
                 img = Image.open(file_path).convert("RGBA")
@@ -94,15 +96,21 @@ def create_gif():
     # Pokud máme nějaké platné obrázky, vytvoříme GIF s unikátním názvem
     os.makedirs(output_folder, exist_ok=True)
     timestamp = now.strftime("%Y%m%d%H%M%S")
-    output_path = os.path.join(output_folder, f'radar_with_map_{timestamp}.gif')
+    output_path = os.path.join(output_folder, f"radar_with_map_{timestamp}.gif")
 
     if overlay_images:
-        overlay_images[0].save(output_path, save_all=True, append_images=overlay_images[1:], duration=500, loop=0)
+        overlay_images[0].save(
+            output_path,
+            save_all=True,
+            append_images=overlay_images[1:],
+            duration=500,
+            loop=0,
+        )
         print(f"GIF byl úspěšně vytvořen: {output_path}")
-        
+
         # Uložení názvu posledního GIFu do souboru
-        with open(os.path.join(output_folder, 'latest_gif.txt'), 'w') as f:
-            f.write(f'radar_with_map_{timestamp}.gif')
+        with open(os.path.join(output_folder, "latest_gif.txt"), "w") as f:
+            f.write(f"radar_with_map_{timestamp}.gif")
     else:
         print("Nebyl nalezen žádný platný obrázek pro vytvoření GIFu.")
 
@@ -111,14 +119,18 @@ def create_gif():
         if os.path.exists(f"layer_{i}.png"):
             os.remove(f"layer_{i}.png")
 
+
 # Funkce pro spuštění jednoduchého HTTP serveru
 def run_http_server():
     global server
     os.chdir(output_folder)
     handler = SimpleHTTPRequestHandler
-    server = StoppableHTTPServer(("0.0.0.0", 3005), handler)  # Upravte port podle potřeby
+    server = StoppableHTTPServer(
+        ("0.0.0.0", 3005), handler
+    )  # Upravte port podle potřeby
     print("Server běží na portu 3005")
     server.serve_forever()
+
 
 # Spuštění HTTP serveru v samostatném vlákně
 thread = threading.Thread(target=run_http_server)
@@ -131,11 +143,13 @@ schedule.every(10).minutes.do(create_gif)  # Aktualizace každých 10 minut
 # Vytvoření počátečního GIFu
 create_gif()
 
+
 # Funkce pro správné ukončení skriptu
 def graceful_shutdown(signum, frame):
     print("Vypínám server...")
     server.shutdown()
     exit(0)
+
 
 # Zachytávání signálů ukončení
 signal.signal(signal.SIGTERM, graceful_shutdown)
