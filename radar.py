@@ -8,8 +8,10 @@ import threading
 import schedule
 import signal
 
-output_folder = "output"
-map_file = "../assets/mapa-cr.png"  # Cesta k souboru s mapou
+# Nastavení pracovního adresáře
+script_dir = os.path.dirname(os.path.abspath(__file__))
+output_folder = os.path.join(script_dir, "output")
+map_file = os.path.join(script_dir, "./assets/mapa-cr.png")  # Cesta k souboru s mapou
 
 
 class StoppableHTTPServer(HTTPServer):
@@ -62,7 +64,7 @@ def create_gif():
     for i, time in enumerate(layers):
         success, content, datum_txt = download_image("", time)
         if success:
-            file_path = f"layer_{i}.png"
+            file_path = os.path.join(output_folder, f"layer_{i}.png")
             with open(file_path, "wb") as file:
                 file.write(content)
             try:
@@ -109,15 +111,17 @@ def create_gif():
         print(f"GIF byl úspěšně vytvořen: {output_path}")
 
         # Uložení názvu posledního GIFu do souboru
-        with open(os.path.join(output_folder, "latest_gif.txt"), "w") as f:
+        latest_gif_path = os.path.join(output_folder, "latest_gif.txt")
+        with open(latest_gif_path, "w") as f:
             f.write(f"radar_with_map_{timestamp}.gif")
     else:
         print("Nebyl nalezen žádný platný obrázek pro vytvoření GIFu.")
 
     # Uklid souborů
     for i in range(len(layers)):
-        if os.path.exists(f"layer_{i}.png"):
-            os.remove(f"layer_{i}.png")
+        layer_path = os.path.join(output_folder, f"layer_{i}.png")
+        if os.path.exists(layer_path):
+            os.remove(layer_path)
 
 
 # Funkce pro spuštění jednoduchého HTTP serveru
