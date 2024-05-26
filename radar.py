@@ -12,6 +12,7 @@ import signal
 script_dir = os.path.dirname(os.path.abspath(__file__))
 output_folder = os.path.join(script_dir, "output")
 map_file = os.path.join(script_dir, "./assets/mapa-cr.png")  # Cesta k souboru s mapou
+max_gifs = 10  # Maximální počet uložených GIFů
 
 
 class StoppableHTTPServer(HTTPServer):
@@ -30,6 +31,14 @@ class StoppableHTTPServer(HTTPServer):
             requests.get(f"http://{self.server_name}:{self.server_port}")
         except requests.RequestException:
             pass
+
+
+def manage_gif_storage(output_folder, max_gifs):
+    gif_files = sorted([f for f in os.listdir(output_folder) if f.endswith(".gif")])
+    while len(gif_files) > max_gifs:
+        file_to_remove = gif_files.pop(0)
+        os.remove(os.path.join(output_folder, file_to_remove))
+        print(f"Smazán starý GIF soubor: {file_to_remove}")
 
 
 def create_gif():
@@ -58,6 +67,10 @@ def create_gif():
     for i in range(6):
         time = now - timedelta(minutes=10 * i)
         layers.append(time)
+
+    # Vytvoření složky output, pokud neexistuje
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
 
     # Stahování vrstev
     images = []
@@ -96,7 +109,6 @@ def create_gif():
         overlay_images.append(overlay)
 
     # Pokud máme nějaké platné obrázky, vytvoříme GIF s unikátním názvem
-    os.makedirs(output_folder, exist_ok=True)
     timestamp = now.strftime("%Y%m%d%H%M%S")
     output_path = os.path.join(output_folder, f"radar_with_map_{timestamp}.gif")
 
@@ -114,6 +126,9 @@ def create_gif():
         latest_gif_path = os.path.join(output_folder, "latest_gif.txt")
         with open(latest_gif_path, "w") as f:
             f.write(f"radar_with_map_{timestamp}.gif")
+
+        # Správa úložiště GIFů
+        manage_gif_storage(output_folder, max_gifs)
     else:
         print("Nebyl nalezen žádný platný obrázek pro vytvoření GIFu.")
 
@@ -127,7 +142,6 @@ def create_gif():
 # Funkce pro spuštění jednoduchého HTTP serveru
 def run_http_server():
     global server
-    os.chdir(output_folder)
     handler = SimpleHTTPRequestHandler
     server = StoppableHTTPServer(
         ("0.0.0.0", 3005), handler
