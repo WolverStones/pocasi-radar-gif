@@ -12,7 +12,22 @@ import signal
 script_dir = os.path.dirname(os.path.abspath(__file__))
 output_folder = os.path.join(script_dir, "output")
 map_file = os.path.join(script_dir, "./assets/mapa-cr.png")  # Cesta k souboru s mapou
+placeholder_file = os.path.join(
+    script_dir, "./assets/placeholder.png"
+)  # Cesta k souboru s placeholder obrázkem
 max_gifs = 10  # Maximální počet uložených GIFů
+
+
+class CustomHTTPRequestHandler(SimpleHTTPRequestHandler):
+    def send_error(self, code, message=None):
+        if code == 404:
+            self.send_response(200)
+            self.send_header("Content-type", "image/png")
+            self.end_headers()
+            with open(placeholder_file, "rb") as file:
+                self.wfile.write(file.read())
+        else:
+            super().send_error(code, message)
 
 
 class StoppableHTTPServer(HTTPServer):
@@ -48,11 +63,14 @@ def create_gif():
             datum_txt = datum.strftime("%Y%m%d.%H%M")[:-1] + "0"
             url = f"https://radar.bourky.cz/data/pacz2gmaps.z_max3d.{datum_txt}.0.png"
             print(f"Stahuji soubor: {url}")
-            response = requests.get(url)
-            if response.status_code == 200:
+            try:
+                response = requests.get(url)
+                response.raise_for_status()
                 return True, response.content, datum_txt
-            else:
-                print(f"HTTP {response.status_code}: Nemohu stáhnout soubor")
+            except requests.RequestException as e:
+                print(
+                    f"HTTP {response.status_code if response else 'Unknown'}: Nemohu stáhnout soubor ({e})"
+                )
                 print("Pokusím se stáhnout o 10 minut starší soubor")
                 datum -= timedelta(minutes=10)
                 retries -= 1
@@ -76,17 +94,29 @@ def create_gif():
     images = []
     for i, time in enumerate(layers):
         success, content, datum_txt = download_image("", time)
+        file_path = os.path.join(output_folder, f"layer_{i}.png")
         if success:
-            file_path = os.path.join(output_folder, f"layer_{i}.png")
             with open(file_path, "wb") as file:
                 file.write(content)
             try:
                 img = Image.open(file_path).convert("RGBA")
-                images.append(img)
-            except UnidentifiedImageError:
-                print(f"Nelze identifikovat obrazový soubor {file_path}")
+            except UnidentifiedImageError as e:
+                print(
+                    f"Nelze identifikovat obrazový soubor {file_path} ({e}), používám placeholder."
+                )
+                img = Image.open(placeholder_file).convert("RGBA")
+            except Exception as e:
+                print(
+                    f"Chyba při otevírání obrázku {file_path} ({e}), používám placeholder."
+                )
+                img = Image.open(placeholder_file).convert("RGBA")
         else:
-            print(f"Přeskakuji soubor pro čas {datum_txt} kvůli selhání stahování.")
+            print(
+                f"Přeskakuji soubor pro čas {datum_txt} kvůli selhání stahování, používám placeholder."
+            )
+            img = Image.open(placeholder_file).convert("RGBA")
+
+        images.append(img)
 
     # Obrácení pořadí obrázků
     images.reverse()
@@ -142,7 +172,7 @@ def create_gif():
 # Funkce pro spuštění jednoduchého HTTP serveru
 def run_http_server():
     global server
-    handler = SimpleHTTPRequestHandler
+    handler = CustomHTTPRequestHandler
     server = StoppableHTTPServer(
         ("0.0.0.0", 3005), handler
     )  # Upravte port podle potřeby
